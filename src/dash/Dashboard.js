@@ -118,8 +118,116 @@
 
 // export default Dashboard;
 
+// import React, { useEffect, useState } from 'react';
+// import { ref, get } from 'firebase/database';
+// import './Dashboard.css'; // Adjust the path as needed
+// import { db } from "../firebase"; // Ensure Firebase is configured
+
+// const Dashboard = () => {
+//   const [usersWithImages, setUsersWithImages] = useState([]); // Initialize as an empty array
+//   const [claimableTokens, setClaimableTokens] = useState(0);
+
+//   useEffect(() => {
+//     fetchUsersWithImages();
+//   }, []);
+
+//   // Fetch all users and filter those with the "images" node
+//   const fetchUsersWithImages = async () => {
+//     const usersRef = ref(db, 'users');
+//     try {
+//       const snapshot = await get(usersRef);
+//       if (snapshot.exists()) {
+//         const usersData = snapshot.val();
+
+//         // Filter users who have the 'images' node
+//         const filteredUsers = Object.keys(usersData).filter(
+//           (userId) => usersData[userId]?.images // Use optional chaining to avoid errors
+//         );
+
+//         // Map filtered users to include userId and their data
+//         const usersWithImagesData = filteredUsers.map((userId) => ({
+//           userId,
+//           ...usersData[userId],
+//         }));
+
+//         setUsersWithImages(usersWithImagesData); // Set the filtered users
+//       } else {
+//         console.error("No user data available.");
+//       }
+//     } catch (error) {
+//       console.error("Error fetching user data:", error);
+//     }
+//   };
+
+//   useEffect(() => {
+//     if (usersWithImages) {
+//       const exchangeRef = ref(db, `users/${usersWithImages}/exchanges/tokens`);
+//       const unsubscribe = onValue(exchangeRef, (snapshot) => {
+//         const tokens = snapshot.val();
+//         setTotalTokens(tokens || 0);
+
+//         const claimable = tokens ? tokens * 0.8 : 0;
+//         setClaimableTokens(claimable);
+//       });
+
+//       return () => unsubscribe();
+//     }
+//   }, [usersWithImages]);
+
+//   return (
+//     <div className="dashboard-layout">
+//       <h1>Users with Images</h1>
+//       {usersWithImages.length > 0 ? (
+//         <div className="table-container">
+//           <table>
+//             <thead>
+//               <tr>
+//                 <th>UserID</th>
+//                 <th>Images Verified</th>
+//                 <th>Pending State</th>
+//                 <th>Tokrn</th>
+//                 <th>20%reduce</th>
+//                 <th>Claim State</th>
+//               </tr>
+//             </thead>
+//             <tbody>
+//               {usersWithImages.map((user) => (
+//                 <tr key={user.userId}>
+//                   <td data-label="UserID">{user.userId}</td>
+//                   <td data-label="Images Verified">
+//                     {user.images && user.images.imageverified ? 'Yes' : 'No'}
+//                   </td>
+//                   <td data-label="Pending State">
+//                     {user.addresswallet && user.addresswallet.pendingstate !== undefined
+//                       ? user.addresswallet.pendingstate ? 'Yes' : 'No'
+//                       : 'N/A'}
+//                   </td>
+// <td>{claimableTokens}</td>
+//                   <td>
+//                    {user.exchanges  && user.exchanges .tokens || 0}
+//                   </td>
+//                   <td data-label="Claim State">
+//                     {user.addresswallet && user.addresswallet.claimstate !== undefined
+//                       ? user.addresswallet.claimstate ? 'Yes' : 'No'
+//                       : 'N/A'}
+//                   </td>
+//                 </tr>
+//               ))}
+//             </tbody>
+//           </table>
+//         </div>
+//       ) : (
+//         <p>No users with images found.</p>
+//       )}
+//     </div>
+//   );
+// };
+
+// export default Dashboard;
+
+
 import React, { useEffect, useState } from 'react';
-import { ref, get } from 'firebase/database';
+import { ref, get, onValue } from 'firebase/database';
 import './Dashboard.css'; // Adjust the path as needed
 import { db } from "../firebase"; // Ensure Firebase is configured
 
@@ -147,9 +255,28 @@ const Dashboard = () => {
         const usersWithImagesData = filteredUsers.map((userId) => ({
           userId,
           ...usersData[userId],
+          claimableTokens: 0, // Add default token fields
+          tokens: 0
         }));
 
-        setUsersWithImages(usersWithImagesData); // Set the filtered users
+        // Set the filtered users
+        setUsersWithImages(usersWithImagesData);
+
+        // Fetch tokens for each user
+        usersWithImagesData.forEach((user) => {
+          const exchangeRef = ref(db, `users/${user.userId}/exchanges/tokens`);
+          onValue(exchangeRef, (snapshot) => {
+            const tokens = snapshot.val() || 0;
+            const claimableTokens = tokens * 0.8;
+            setUsersWithImages((prevUsers) =>
+              prevUsers.map((u) =>
+                u.userId === user.userId
+                  ? { ...u, tokens, claimableTokens }
+                  : u
+              )
+            );
+          });
+        });
       } else {
         console.error("No user data available.");
       }
@@ -169,7 +296,8 @@ const Dashboard = () => {
                 <th>UserID</th>
                 <th>Images Verified</th>
                 <th>Pending State</th>
-                <th>Tokrn</th>
+                <th>Tokens</th>
+                <th>Claimable Tokens (20% reduced)</th>
                 <th>Claim State</th>
               </tr>
             </thead>
@@ -185,9 +313,8 @@ const Dashboard = () => {
                       ? user.addresswallet.pendingstate ? 'Yes' : 'No'
                       : 'N/A'}
                   </td>
-                  <td>
-                   {user.exchanges  && user.exchanges .tokens || 0}
-                  </td>
+                  <td data-label="Tokens">{user.tokens}</td>
+                  <td data-label="Claimable Tokens">{user.claimableTokens}</td>
                   <td data-label="Claim State">
                     {user.addresswallet && user.addresswallet.claimstate !== undefined
                       ? user.addresswallet.claimstate ? 'Yes' : 'No'
